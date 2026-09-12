@@ -75,6 +75,16 @@ const defaultSleep = async (milliseconds: number): Promise<void> => {
   await new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 };
 
+const positivePollCount = (value: number | undefined, fallback: number): number => {
+  if (value === undefined || !Number.isFinite(value)) return fallback;
+  return Math.max(1, Math.trunc(value));
+};
+
+const nonNegativeInterval = (value: number | undefined): number => {
+  if (value === undefined || !Number.isFinite(value)) return 1_000;
+  return Math.max(0, value);
+};
+
 export async function runTrackedTransaction<TTransaction, TSigned>(
   options: RunTrackedTransactionOptions<TTransaction, TSigned>,
 ): Promise<TxTruthSnapshot> {
@@ -105,7 +115,12 @@ export async function runTrackedTransaction<TTransaction, TSigned>(
   try {
     simulation = await options.simulate(options.transaction);
   } catch (error) {
-    simulation = { ok: false, error: normalizeError(error, "simulation_error") };
+    recorder.record({
+      type: "simulation_unavailable",
+      at: now(),
+      error: normalizeError(error, "simulation_unavailable"),
+    });
+    return recorder.snapshot();
   }
   if (!simulation.ok) {
     recorder.record({
@@ -174,16 +189,25 @@ export async function runTrackedTransaction<TTransaction, TSigned>(
   } else {
     const rpcSignature = submission.signature ?? localSignature;
     if (rpcSignature !== localSignature) {
-      throw new Error("RPC signature did not match the locally signed transaction");
+      recorder.record({
+        type: "submission_failed",
+        at: now(),
+        error: {
+          code: "signature_mismatch",
+          message: "RPC signature did not match the locally signed transaction",
+        },
+      });
+    } else {
+      recorder.record({
+        type: "submission_accepted",
+        at: now(),
+        signature: localSignature,
+      });
     }
-    recorder.record({
-      type: "submission_accepted",
-      at: now(),
-      signature: localSignature,
-    });
   }
 
-  const maxPolls = options.maxPolls ?? 20;
+  const maxPolls = positivePollCount(options.maxPolls, 20);
+  const pollIntervalMs = nonNegativeInterval(options.pollIntervalMs);
   for (let poll = 0; poll < maxPolls; poll += 1) {
     let status: SignatureStatus | null = null;
     try {
@@ -226,7 +250,7 @@ export async function runTrackedTransaction<TTransaction, TSigned>(
     }
 
     if (poll < maxPolls - 1) {
-      await sleep(options.pollIntervalMs ?? 1_000);
+      await sleep(pollIntervalMs);
     }
   }
 
@@ -244,7 +268,25 @@ export async function reconcileTrackedTransaction(
 ): Promise<TxTruthSnapshot> {
   const now = options.now ?? Date.now;
   const sleep = options.sleep ?? defaultSleep;
-  const maxPolls = options.maxPolls ?? 12;
+  const maxPolls = positivePollCount(options.maxPolls, 12);
+  const pollIntervalMs = nonNegativeInterval(options.pollIntervalMs);
+  const existingSignatures = options.recorder
+    .snapshot()
+    .events.map((event) =>
+      event.type === "wallet_signed" ||
+      event.type === "signature_tracked" ||
+      event.type === "submission_accepted" ||
+      event.type === "signature_observed"
+        ? event.signature
+        : undefined,
+    )
+    .filter((signature): signature is string => Boolean(signature));
+  if (existingSignatures.some((signature) => signature !== options.signature)) {
+    throw new Error("Cannot reconcile a different transaction signature");
+  }
+  if (existingSignatures.length === 0) {
+    throw new Error("Reconciliation requires a recorder with a known transaction signature");
+  }
 
   for (let poll = 0; poll < maxPolls; poll += 1) {
     let status: SignatureStatus | null = null;
@@ -293,7 +335,7 @@ export async function reconcileTrackedTransaction(
     }
 
     if (poll < maxPolls - 1) {
-      await sleep(options.pollIntervalMs ?? 1_000);
+      await sleep(pollIntervalMs);
     }
   }
 

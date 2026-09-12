@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowSquareOut,
-  CheckCircle,
   Coins,
   Copy,
   Lightning,
@@ -34,11 +33,16 @@ function formatSol(value: bigint): string {
 }
 
 function shortAddress(address: string): string {
-  return `${address.slice(0, 6)}...${address.slice(-5)}`;
+  return `${address.slice(0, 6)}…${address.slice(-5)}`;
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
+  if (error instanceof Error) {
+    if (/reject|declin|cancel/i.test(error.message)) {
+      return "The wallet request was cancelled. Nothing new was submitted.";
+    }
+    return error.message;
+  }
   return "The Devnet request could not be completed.";
 }
 
@@ -53,6 +57,8 @@ export function DevnetTransactionPanel() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<JsonPresentation | null>(null);
+  const [submittedSignature, setSubmittedSignature] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const walletAddress = useMemo(
     () => connected ? address(connected.account.address) : null,
     [connected],
@@ -74,6 +80,7 @@ export function DevnetTransactionPanel() {
   useEffect(() => {
     setBalance(null);
     setResult(null);
+    setSubmittedSignature(null);
     setError(null);
     void refreshBalance();
   }, [refreshBalance]);
@@ -98,6 +105,24 @@ export function DevnetTransactionPanel() {
     }
   };
 
+  const connectWallet = async (wallet: (typeof wallets)[number]) => {
+    setError(null);
+    try {
+      await connect.dispatchAsync(wallet);
+    } catch (reason) {
+      setError(errorMessage(reason));
+    }
+  };
+
+  const disconnectWallet = async () => {
+    setError(null);
+    try {
+      await disconnect.dispatchAsync();
+    } catch (reason) {
+      setError(errorMessage(reason));
+    }
+  };
+
   const inspect = async (signature: string): Promise<JsonPresentation> => {
     const response = await fetch("/api/inspect", {
       method: "POST",
@@ -114,6 +139,7 @@ export function DevnetTransactionPanel() {
     setSending(true);
     setError(null);
     setResult(null);
+    setSubmittedSignature(null);
     try {
       const transaction = devnetClient.system.instructions.transferSol({
         source: connected.signer,
@@ -121,13 +147,31 @@ export function DevnetTransactionPanel() {
         amount: 1n,
       });
       const sent = await transaction.sendTransaction();
-      const signature = sent.context.signature;
-      let inspection = await inspect(signature);
-      for (let attempt = 0; attempt < 4 && inspection.outcome === "in_progress"; attempt += 1) {
-        await new Promise((resolve) => window.setTimeout(resolve, 900));
-        inspection = await inspect(signature);
+      const signature = String(sent.context.signature);
+      setSubmittedSignature(signature);
+      let inspection: JsonPresentation | null = null;
+      let inspectionError: unknown = null;
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        try {
+          inspection = await inspect(signature);
+          inspectionError = null;
+          if (inspection.outcome !== "in_progress" && inspection.outcome !== "indeterminate") {
+            break;
+          }
+        } catch (reason) {
+          inspectionError = reason;
+        }
+        if (attempt < 7) {
+          await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+        }
       }
-      setResult(inspection);
+      if (inspection) {
+        setResult(inspection);
+      } else {
+        setError(
+          `Transaction submitted, but evidence lookup is temporarily unavailable. Verify the preserved signature on Devnet Explorer. ${errorMessage(inspectionError)}`,
+        );
+      }
       await refreshBalance();
     } catch (reason) {
       setError(errorMessage(reason));
@@ -140,22 +184,22 @@ export function DevnetTransactionPanel() {
     <section className="devnet-transaction" aria-labelledby="devnet-transaction-title">
       <div className="devnet-transaction-copy">
         <span>Live Devnet proof</span>
-        <h2 id="devnet-transaction-title">Run the complete wallet lifecycle</h2>
-        <p>A fixed self-transfer returns one lamport to your wallet. Only free Devnet SOL is used for the network fee.</p>
+        <h2 id="devnet-transaction-title">Send and independently verify a wallet transaction</h2>
+        <p>Solana Kit sends a fixed self-transfer, then TxTruth verifies the returned signature. One lamport returns to your wallet; only free Devnet SOL is used for the fee.</p>
       </div>
 
-      <div className="wallet-console" aria-live="polite">
+      <div className="wallet-console" aria-live="polite" aria-busy={connect.isRunning || airdropping || sending || loadingBalance}>
         <div className="wallet-status">
-          <Wallet size={23} weight="duotone" />
+          <Wallet aria-hidden="true" size={23} weight="duotone" />
           <div><span>Wallet</span><strong>{walletLabel}</strong></div>
-          {connected && <button className="text-action" type="button" onClick={() => disconnect.dispatch()} disabled={disconnect.isRunning}>Disconnect</button>}
+          {connected && <button className="text-action" type="button" onClick={() => void disconnectWallet()} disabled={disconnect.isRunning}>Disconnect</button>}
         </div>
 
         {!connected && (
           <div className="wallet-picker">
             {wallets.length > 0 ? wallets.map((wallet) => (
-              <button key={wallet.name} type="button" onClick={() => connect.dispatch(wallet)} disabled={connect.isRunning}>
-                <Wallet size={16} /> {connect.isRunning ? "Connecting" : `Connect ${wallet.name}`}
+              <button key={wallet.name} type="button" onClick={() => void connectWallet(wallet)} disabled={connect.isRunning}>
+                <Wallet aria-hidden="true" size={16} /> {connect.isRunning ? "Connecting…" : `Connect ${wallet.name}`}
               </button>
             )) : <p><WarningCircle size={17} /> Install or unlock a Wallet Standard wallet such as Phantom or Solflare, then refresh this page.</p>}
           </div>
@@ -164,27 +208,46 @@ export function DevnetTransactionPanel() {
         {connected && (
           <div className="devnet-actions">
             <div className="balance-readout">
-              <Coins size={18} weight="duotone" />
+              <Coins aria-hidden="true" size={18} weight="duotone" />
               <span>Devnet balance</span>
-              <strong>{loadingBalance || balance === null ? "Checking" : formatSol(balance)}</strong>
+              <strong>{loadingBalance || balance === null ? "Checking…" : formatSol(balance)}</strong>
               <button className="text-action" type="button" onClick={() => void refreshBalance()} disabled={loadingBalance}>Refresh</button>
             </div>
             <div className="devnet-action-buttons">
               <button type="button" onClick={requestAirdrop} disabled={airdropping}>
-                {airdropping ? <SpinnerGap className="spin" size={16} /> : <Coins size={16} />}
-                {airdropping ? "Requesting Devnet SOL" : "Request Devnet SOL"}
+                {airdropping ? <SpinnerGap aria-hidden="true" className="spin" size={16} /> : <Coins aria-hidden="true" size={16} />}
+                {airdropping ? "Requesting Devnet SOL…" : "Request Devnet SOL"}
               </button>
               <a href="https://faucet.solana.com" target="_blank" rel="noreferrer">Open Devnet Faucet <ArrowSquareOut size={14} /></a>
               <button className="run-live" type="button" onClick={sendSelfTransfer} disabled={!hasEnoughBalance || sending}>
-                {sending ? <SpinnerGap className="spin" size={16} /> : <Lightning size={16} weight="fill" />}
-                {sending ? "Awaiting wallet and RPC" : "Run 1-lamport self-transfer"}
+                {sending ? <SpinnerGap aria-hidden="true" className="spin" size={16} /> : <Lightning aria-hidden="true" size={16} weight="fill" />}
+                {sending ? "Awaiting wallet and RPC…" : "Run 1-lamport self-transfer"}
               </button>
             </div>
             {!hasEnoughBalance && !loadingBalance && <p className="balance-warning">Request Devnet SOL before running the demonstration. Public airdrops can be rate-limited.</p>}
           </div>
         )}
 
-        {error && <p className="live-error"><WarningCircle size={18} /> {error}</p>}
+        {submittedSignature && !result && (
+          <div className="submitted-signature">
+            <span>Submitted signature</span>
+            <code>{submittedSignature.slice(0, 18)}…{submittedSignature.slice(-7)}</code>
+            <button
+              type="button"
+              aria-label="Copy submitted transaction signature"
+              onClick={() => void navigator.clipboard.writeText(submittedSignature).then(() => {
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 1_400);
+              })}
+            >
+              <Copy aria-hidden="true" size={15} /> {copied ? "Copied" : "Copy"}
+            </button>
+            <a href={`https://explorer.solana.com/tx/${submittedSignature}?cluster=devnet`} target="_blank" rel="noreferrer">
+              Verify <ArrowSquareOut aria-hidden="true" size={14} />
+            </a>
+          </div>
+        )}
+        {error && <p className="live-error"><WarningCircle aria-hidden="true" size={18} /> {error}</p>}
         {result && (() => {
           const meta = outcomeMeta(result.outcome);
           return <div className={`live-verdict tone-${meta.tone}`}>

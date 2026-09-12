@@ -27,7 +27,7 @@ export default function HomePage() {
   const presentation = runScenario(scenario);
 
   return (
-    <main>
+    <main id="main-content">
       <SiteNav />
       <section className="hero section-shell" id="product">
         <div className="hero-copy">

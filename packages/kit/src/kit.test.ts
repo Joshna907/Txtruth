@@ -61,6 +61,32 @@ describe("runTrackedTransaction", () => {
     expect(presentation.outcome).toBe("indeterminate");
   });
 
+  it("does not claim preflight failure when the simulation RPC is unavailable", async () => {
+    const snapshot = await runTrackedTransaction({
+      ...defaults(),
+      simulate: async () => {
+        throw new Error("RPC unavailable");
+      },
+      getSignatureStatus: async () => null,
+    });
+    const presentation = deriveTxTruthPresentation(snapshot);
+    expect(presentation.outcome).toBe("indeterminate");
+    expect(presentation.feeImpact).toBe("none");
+    expect(presentation.retryPolicy).toBe("user_may_restart");
+  });
+
+  it("keeps tracking the local signature when the RPC returns a mismatch", async () => {
+    const snapshot = await runTrackedTransaction({
+      ...defaults(),
+      send: async () => ({ status: "accepted", signature: "wrong-signature" }),
+      getSignatureStatus: async () => null,
+      maxPolls: 1,
+    });
+    const presentation = deriveTxTruthPresentation(snapshot);
+    expect(presentation.signature).toBe("signature");
+    expect(presentation.outcome).toBe("indeterminate");
+  });
+
   it("resolves a submitted transaction at required commitment", async () => {
     let polls = 0;
     const snapshot = await runTrackedTransaction({
@@ -108,5 +134,19 @@ describe("runTrackedTransaction", () => {
     const presentation = deriveTxTruthPresentation(snapshot);
     expect(presentation.outcome).toBe("confirmed_success");
     expect(presentation.feeLamports).toBe(5_000n);
+  });
+
+  it("refuses to reconcile a recorder that has no known signature", async () => {
+    const recorder = createTxTruthRecorder({
+      cluster: "devnet",
+      requiredCommitment: "confirmed",
+    });
+    recorder.record({ type: "transaction_created", at: 1, messageHash: "hash" });
+    await expect(reconcileTrackedTransaction({
+      recorder,
+      signature: "signature",
+      commitment: "confirmed",
+      getSignatureStatus: async () => null,
+    })).rejects.toThrow(/known transaction signature/);
   });
 });

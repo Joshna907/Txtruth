@@ -36,7 +36,10 @@ function validateNext(events: readonly TxTruthEventV1[], event: TxTruthEventV1):
   }
 
   const wasRejectedBeforeSubmission = events.some(
-    (item) => item.type === "wallet_rejected" || item.type === "simulation_failed",
+    (item) =>
+      item.type === "wallet_rejected" ||
+      item.type === "simulation_failed" ||
+      item.type === "simulation_unavailable",
   );
   if (
     wasRejectedBeforeSubmission &&

@@ -132,4 +132,22 @@ describe("TxTruth recorder and presentation", () => {
     expect(presentation.signature).toBe(signature);
     expect(presentation.feeLamports).toBe(5_000n);
   });
+
+  it("retains earlier exact fee evidence when commitment advances", () => {
+    const recorder = submittedRecorder();
+    recorder.record({
+      type: "signature_observed",
+      at: 9,
+      signature,
+      commitment: "processed",
+      feeLamports: 5_000n,
+    });
+    recorder.record({
+      type: "signature_observed",
+      at: 10,
+      signature,
+      commitment: "confirmed",
+    });
+    expect(deriveTxTruthPresentation(recorder.snapshot()).feeLamports).toBe(5_000n);
+  });
 });

@@ -67,6 +67,7 @@ function sanitizeEvent(
         ...(event.error ? { error: sanitizeError(event.error) } : {}),
       };
     case "simulation_failed":
+    case "simulation_unavailable":
       return { ...event, error: sanitizeError(event.error) };
     case "wallet_rejected":
     case "submission_failed":

@@ -28,6 +28,7 @@ export type TxTruthEventV1 =
       error: NormalizedError;
       logs: string[];
     }
+  | { type: "simulation_unavailable"; at: number; error: NormalizedError }
   | { type: "wallet_requested"; at: number; wallet?: string }
   | { type: "wallet_rejected"; at: number; error: NormalizedError }
   | { type: "wallet_signed"; at: number; signature: string }

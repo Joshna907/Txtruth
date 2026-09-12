@@ -34,7 +34,19 @@ type TransactionResult = {
   meta: { err: unknown; fee: number } | null;
 } | null;
 
-const devnetEndpoint = process.env.SOLANA_DEVNET_RPC_URL ?? "https://api.devnet.solana.com";
+function resolveDevnetEndpoint(): string {
+  const value = process.env.SOLANA_DEVNET_RPC_URL ?? "https://api.devnet.solana.com";
+  const endpoint = new URL(value);
+  if (endpoint.protocol !== "https:" && endpoint.protocol !== "http:") {
+    throw new Error("SOLANA_DEVNET_RPC_URL must use HTTP or HTTPS.");
+  }
+  if (endpoint.hostname === "api.mainnet-beta.solana.com" || endpoint.hostname === "api.testnet.solana.com") {
+    throw new Error("SOLANA_DEVNET_RPC_URL must point to Solana Devnet.");
+  }
+  return endpoint.toString();
+}
+
+const devnetEndpoint = resolveDevnetEndpoint();
 
 export function isSolanaSignature(value: string): boolean {
   return /^[1-9A-HJ-NP-Za-km-z]{64,90}$/.test(value);
@@ -107,21 +119,36 @@ export async function inspectSolanaSignature(options: {
   recorder.record({ type: "transaction_created", at: now(), messageHash: "external-signature" });
   recorder.record({ type: "signature_tracked", at: now(), signature });
 
+  if (!Array.isArray(statuses.value)) {
+    throw new Error("Solana RPC returned an invalid signature-status response.");
+  }
   const status = statuses.value[0];
   if (!status) {
     recorder.record({ type: "confirmation_timed_out", at: now() });
   } else {
+    const commitment =
+      status.confirmationStatus === "confirmed" || status.confirmationStatus === "finalized"
+        ? status.confirmationStatus
+        : "processed";
+    const slot = transaction?.slot ?? status.slot;
+    if (!Number.isSafeInteger(slot) || slot < 0) {
+      throw new Error("Solana RPC returned an invalid transaction slot.");
+    }
+    const fee = transaction?.meta?.fee;
+    if (fee !== undefined && (!Number.isSafeInteger(fee) || fee < 0)) {
+      throw new Error("Solana RPC returned an invalid transaction fee.");
+    }
     const transactionError = transaction?.meta?.err ?? status.err;
     recorder.record({
       type: "signature_observed",
       at: now(),
       signature,
-      commitment: status.confirmationStatus ?? "processed",
-      slot: BigInt(transaction?.slot ?? status.slot),
-      ...(transaction?.meta?.fee === undefined
+      commitment,
+      slot: BigInt(slot),
+      ...(fee === undefined
         ? {}
-        : { feeLamports: BigInt(transaction.meta.fee) }),
-      ...(transactionError === null
+        : { feeLamports: BigInt(fee) }),
+      ...(transactionError === null || transactionError === undefined
         ? {}
         : { error: normalizeRpcError(transactionError) }),
     });

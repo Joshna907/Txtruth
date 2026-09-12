@@ -4,9 +4,9 @@ import { LabShell } from "@/components/lab-shell";
 
 export default function LabPage() {
   return (
-    <main className="lab-page">
+    <main id="main-content" className="lab-page">
       <SiteNav lab />
-      <Suspense fallback={<div className="lab-loading">Preparing transaction evidence...</div>}>
+      <Suspense fallback={<div className="lab-loading">Preparing transaction evidence…</div>}>
         <LabShell />
       </Suspense>
     </main>

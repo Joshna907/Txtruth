@@ -52,7 +52,7 @@ function isScenarioId(value: string | null): value is ScenarioId {
 
 function eventTone(event: string): "mint" | "amber" | "red" | "muted" {
   if (event.includes("failed") || event === "wallet_rejected") return "red";
-  if (event.includes("timed_out") || event.includes("height")) return "amber";
+  if (event.includes("timed_out") || event.includes("height") || event.includes("unavailable")) return "amber";
   if (event.includes("succeeded") || event.includes("accepted") || event.includes("observed")) return "mint";
   return "muted";
 }
@@ -217,16 +217,17 @@ export function LabShell() {
           <div>
             <input
               id="live-signature"
+              name="signature"
               value={liveSignature}
               onChange={(event) => setLiveSignature(event.target.value)}
-              placeholder="Paste a Solana transaction signature"
+              placeholder="Paste a Solana transaction signature…"
               autoComplete="off"
               spellCheck={false}
               required
             />
             <button type="submit" disabled={liveLoading}>
               {liveLoading ? <SpinnerGap className="spin" size={17} /> : <MagnifyingGlass size={17} />}
-              {liveLoading ? "Inspecting" : "Inspect"}
+              {liveLoading ? "Inspecting…" : "Inspect"}
             </button>
           </div>
         </form>
@@ -347,7 +348,7 @@ export function LabShell() {
             <div className="signature-block">
               <span>Signature</span>
               <button onClick={copySignature} aria-label="Copy transaction signature">
-                <code>{presentation.signature.slice(0, 18)}...{presentation.signature.slice(-7)}</code>
+                <code>{presentation.signature.slice(0, 18)}…{presentation.signature.slice(-7)}</code>
                 {copied ? <Check size={16} /> : <Copy size={16} />}
               </button>
             </div>

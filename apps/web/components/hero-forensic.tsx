@@ -16,7 +16,7 @@ export function HeroForensic({ presentation }: { presentation: TxTruthPresentati
     <div className="forensic-window" aria-label="Transaction evidence comparison">
       <div className="window-bar">
         <span>Transaction forensic</span>
-        <span className="window-signature">SIG 4TxT...111</span>
+        <span className="window-signature">SIG 4TxT…111</span>
       </div>
       <div className="claim-comparison">
         <div className="claim bad">

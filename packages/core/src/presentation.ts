@@ -32,6 +32,8 @@ function evidenceSummary(event: TxTruthEventV1): string {
       return "Preflight simulation succeeded.";
     case "simulation_failed":
       return `Preflight simulation failed: ${event.error.message}`;
+    case "simulation_unavailable":
+      return `Preflight simulation was unavailable: ${event.error.message}`;
     case "wallet_requested":
       return "Wallet authorization requested.";
     case "wallet_rejected":
@@ -97,6 +99,9 @@ export function deriveTxTruthPresentation(
         commitmentRank[event.commitment] >=
           commitmentRank[snapshot.config.requiredCommitment],
     );
+  const observedFee = [...observedEvents]
+    .reverse()
+    .find((event) => event.feeLamports !== undefined)?.feeLamports;
 
   if (observedFailure) {
     return {
@@ -106,9 +111,9 @@ export function deriveTxTruthPresentation(
       message:
         "The transaction landed, but a program returned an error. Program state changes were rolled back; the network fee was still charged.",
       feeImpact: "fee_charged",
-      ...(observedFailure.feeLamports === undefined
+      ...(observedFee === undefined
         ? {}
-        : { feeLamports: observedFailure.feeLamports }),
+        : { feeLamports: observedFee }),
       retryPolicy: "fix_input_then_rebuild",
       signature: observedFailure.signature,
       explorerUrl: explorerUrl(snapshot, observedFailure.signature),
@@ -123,9 +128,9 @@ export function deriveTxTruthPresentation(
       title: "Transaction confirmed",
       message: `The transaction reached ${observedSuccess.commitment} commitment without an execution error.`,
       feeImpact: "fee_charged",
-      ...(observedSuccess.feeLamports === undefined
+      ...(observedFee === undefined
         ? {}
-        : { feeLamports: observedSuccess.feeLamports }),
+        : { feeLamports: observedFee }),
       retryPolicy: "none",
       signature: observedSuccess.signature,
       explorerUrl: explorerUrl(snapshot, observedSuccess.signature),
@@ -155,6 +160,20 @@ export function deriveTxTruthPresentation(
       message: `Simulation failed before submission: ${simulationFailed.error.message}`,
       feeImpact: "none",
       retryPolicy: "fix_input_then_rebuild",
+      evidence,
+    };
+  }
+
+  const simulationUnavailable = findLast(events, "simulation_unavailable");
+  if (simulationUnavailable) {
+    return {
+      outcome: "indeterminate",
+      certainty: "unknown",
+      title: "Preflight simulation was unavailable",
+      message:
+        "The RPC did not return simulation evidence. Nothing was signed or submitted, so you can safely try again.",
+      feeImpact: "none",
+      retryPolicy: "user_may_restart",
       evidence,
     };
   }
