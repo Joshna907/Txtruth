@@ -1,0 +1,16 @@
+{
+  "name": "txtruth-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.19.0",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "dev": "pnpm --filter @txtruth/web run dev",
+    "test": "pnpm -r run test",
+    "typecheck": "pnpm -r run typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
