@@ -228,7 +228,7 @@ export function DevnetTransactionPanel() {
           </div>
         )}
 
-        {submittedSignature && !result && (
+        {submittedSignature && (
           <div className="submitted-signature">
             <span>Submitted signature</span>
             <code>{submittedSignature.slice(0, 18)}…{submittedSignature.slice(-7)}</code>
@@ -257,7 +257,7 @@ export function DevnetTransactionPanel() {
               <div><dt>Fee</dt><dd>{result.feeLamports ? formatSol(BigInt(result.feeLamports)) : feeLabel(result.feeImpact)}</dd></div>
               <div><dt>Retry</dt><dd>{retryLabel(result.retryPolicy)}</dd></div>
             </dl>
-            {result.explorerUrl && <a href={result.explorerUrl} target="_blank" rel="noreferrer">Verify on Devnet Explorer <ArrowSquareOut size={15} /></a>}
+            {result.explorerUrl && <a href={result.explorerUrl} target="_blank" rel="noreferrer">Verify on Devnet Explorer <ArrowSquareOut aria-hidden="true" size={15} /></a>}
           </div>;
         })()}
       </div>
