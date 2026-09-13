@@ -25,6 +25,12 @@ type JsonPresentation = Omit<TxTruthPresentation, "feeLamports"> & { feeLamports
 
 const MINIMUM_DEMO_BALANCE = 10_000n;
 const AIRDROP_AMOUNT = 1_000_000_000n;
+const LAST_SIGNATURE_STORAGE_KEY = "txtruth:last-devnet-signature";
+
+type StoredSignature = {
+  walletAddress: string;
+  signature: string;
+};
 
 function formatSol(value: bigint): string {
   const whole = value / AIRDROP_AMOUNT;
@@ -80,10 +86,25 @@ export function DevnetTransactionPanel() {
   useEffect(() => {
     setBalance(null);
     setResult(null);
-    setSubmittedSignature(null);
     setError(null);
+    if (!walletAddress) {
+      setSubmittedSignature(null);
+      return;
+    }
+    try {
+      const saved = JSON.parse(
+        window.localStorage.getItem(LAST_SIGNATURE_STORAGE_KEY) ?? "null",
+      ) as Partial<StoredSignature> | null;
+      setSubmittedSignature(
+        saved?.walletAddress === walletAddress && typeof saved.signature === "string"
+          ? saved.signature
+          : null,
+      );
+    } catch {
+      setSubmittedSignature(null);
+    }
     void refreshBalance();
-  }, [refreshBalance]);
+  }, [refreshBalance, walletAddress]);
 
   const hasEnoughBalance = balance !== null && balance >= MINIMUM_DEMO_BALANCE;
   const walletLabel = useMemo(
@@ -140,6 +161,7 @@ export function DevnetTransactionPanel() {
     setError(null);
     setResult(null);
     setSubmittedSignature(null);
+    window.localStorage.removeItem(LAST_SIGNATURE_STORAGE_KEY);
     try {
       const transaction = devnetClient.system.instructions.transferSol({
         source: connected.signer,
@@ -149,6 +171,10 @@ export function DevnetTransactionPanel() {
       const sent = await transaction.sendTransaction();
       const signature = String(sent.context.signature);
       setSubmittedSignature(signature);
+      window.localStorage.setItem(
+        LAST_SIGNATURE_STORAGE_KEY,
+        JSON.stringify({ walletAddress, signature } satisfies StoredSignature),
+      );
       let inspection: JsonPresentation | null = null;
       let inspectionError: unknown = null;
       for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -230,7 +256,7 @@ export function DevnetTransactionPanel() {
 
         {submittedSignature && (
           <div className="submitted-signature">
-            <span>Submitted signature</span>
+            <span>Latest live Devnet signature</span>
             <code>{submittedSignature.slice(0, 18)}…{submittedSignature.slice(-7)}</code>
             <button
               type="button"
