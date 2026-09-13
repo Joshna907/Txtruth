@@ -10,7 +10,6 @@ import {
   CaretDown,
   Check,
   CheckCircle,
-  Copy,
   MagnifyingGlass,
   Pause,
   Play,
@@ -76,7 +75,6 @@ export function LabShell() {
   const [visibleCount, setVisibleCount] = useState(scenario.events.length);
   const [playback, setPlayback] = useState<Playback>("complete");
   const [expanded, setExpanded] = useState<number | null>(scenario.events.length - 1);
-  const [copied, setCopied] = useState(false);
   const [liveSignature, setLiveSignature] = useState("");
   const [livePresentation, setLivePresentation] = useState<LivePresentation | null>(null);
   const [liveError, setLiveError] = useState<string | null>(null);
@@ -161,13 +159,6 @@ export function LabShell() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [next, playback, previous, replay, run, togglePause]);
-
-  const copySignature = async () => {
-    if (!presentation.signature) return;
-    await navigator.clipboard.writeText(presentation.signature);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1400);
-  };
 
   const inspectSignature = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -346,15 +337,10 @@ export function LabShell() {
           </dl>
           {presentation.signature && (
             <div className="signature-block">
-              <span>Signature</span>
-              <button onClick={copySignature} aria-label="Copy transaction signature">
-                <code>{presentation.signature.slice(0, 18)}…{presentation.signature.slice(-7)}</code>
-                {copied ? <Check size={16} /> : <Copy size={16} />}
-              </button>
+              <span>Simulated signature</span>
+              <code>{presentation.signature.slice(0, 18)}…{presentation.signature.slice(-7)}</code>
+              <small>Guided scenario data only. It is not an on-chain transaction.</small>
             </div>
-          )}
-          {presentation.explorerUrl && (
-            <a className="explorer-button" href={presentation.explorerUrl} target="_blank" rel="noreferrer">View on Explorer <ArrowSquareOut size={16} /></a>
           )}
           <div className="truth-comparison">
             <span>How this compares</span>
