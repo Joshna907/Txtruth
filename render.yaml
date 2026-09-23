@@ -8,7 +8,8 @@ services:
     # Build the complete workspace in dependency order. The web app imports the
     # generated dist output from @txtruth/core and @txtruth/testkit.
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm -r run build
-    startCommand: corepack enable && pnpm --filter @txtruth/web start -- -p $PORT
+    # Render provides PORT automatically; Next.js reads it from the environment.
+    startCommand: corepack enable && pnpm --filter @txtruth/web start
     healthCheckPath: /
 
     envVars:
