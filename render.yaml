@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: txtruth
+    runtime: node
+    plan: free
+    region: singapore
+
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @txtruth/web build
+    startCommand: corepack enable && pnpm --filter @txtruth/web start -- -p $PORT
+    healthCheckPath: /
+
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: NODE_ENV
+        value: production
+      - key: SOLANA_DEVNET_RPC_URL
+        value: https://api.devnet.solana.com
