@@ -35,10 +35,15 @@ export function outcomeMeta(outcome: TxTruthOutcome): OutcomeMeta {
   }
 }
 
-export function certaintyLabel(certainty: TxTruthPresentation["certainty"]): string {
+export function certaintyLabel(
+  certainty: TxTruthPresentation["certainty"],
+  outcome?: TxTruthOutcome,
+): string {
   switch (certainty) {
     case "observed":
-      return "Observed on-chain";
+      return outcome === "cancelled_by_user" || outcome === "preflight_failed"
+        ? "Observed locally"
+        : "Observed on-chain";
     case "derived":
       return "Derived from evidence";
     case "unknown":

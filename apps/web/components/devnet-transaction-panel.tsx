@@ -276,15 +276,34 @@ export function DevnetTransactionPanel() {
         {error && <p className="live-error"><WarningCircle aria-hidden="true" size={18} /> {error}</p>}
         {result && (() => {
           const meta = outcomeMeta(result.outcome);
-          return <div className={`live-verdict tone-${meta.tone}`}>
-            <div><span>{meta.label}</span><strong>{result.title}</strong><p>{result.message}</p></div>
-            <dl>
-              <div><dt>Certainty</dt><dd>{certaintyLabel(result.certainty)}</dd></div>
-              <div><dt>Fee</dt><dd>{result.feeLamports ? formatSol(BigInt(result.feeLamports)) : feeLabel(result.feeImpact)}</dd></div>
-              <div><dt>Retry</dt><dd>{retryLabel(result.retryPolicy)}</dd></div>
-            </dl>
-            {result.explorerUrl && <a href={result.explorerUrl} target="_blank" rel="noreferrer">Verify on Devnet Explorer <ArrowSquareOut aria-hidden="true" size={15} /></a>}
-          </div>;
+          return <>
+            <div className={`live-verdict tone-${meta.tone}`}>
+              <div><span>{meta.label}</span><strong>{result.title}</strong><p>{result.message}</p></div>
+              <dl>
+                <div><dt>Certainty</dt><dd>{certaintyLabel(result.certainty, result.outcome)}</dd></div>
+                <div><dt>Fee</dt><dd>{result.feeLamports ? formatSol(BigInt(result.feeLamports)) : feeLabel(result.feeImpact)}</dd></div>
+                <div><dt>Retry</dt><dd>{retryLabel(result.retryPolicy)}</dd></div>
+              </dl>
+              {result.explorerUrl && <a href={result.explorerUrl} target="_blank" rel="noreferrer">Verify on Devnet Explorer <ArrowSquareOut aria-hidden="true" size={15} /></a>}
+            </div>
+            <section className="live-evidence" aria-label="Live Devnet inspection evidence">
+              <div className="live-evidence-heading">
+                <span>Evidence timeline</span>
+                <small>Independent Devnet inspection after submission</small>
+              </div>
+              <ol>
+                {result.evidence.map((item, index) => (
+                  <li key={`${item.event}-${index}`}>
+                    <span className="live-evidence-index">{String(index + 1).padStart(2, "0")}</span>
+                    <div>
+                      <code>{item.event.replaceAll("_", " ")}</code>
+                      <p>{item.summary}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          </>;
         })()}
       </div>
     </section>

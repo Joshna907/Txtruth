@@ -234,7 +234,7 @@ export function LabShell() {
                   <p>{livePresentation.message}</p>
                 </div>
                 <dl>
-                  <div><dt>Certainty</dt><dd>{certaintyLabel(livePresentation.certainty)}</dd></div>
+                  <div><dt>Certainty</dt><dd>{certaintyLabel(livePresentation.certainty, livePresentation.outcome)}</dd></div>
                   <div><dt>Fee</dt><dd>{livePresentation.feeLamports ? formatLamports(livePresentation.feeLamports) : feeLabel(livePresentation.feeImpact)}</dd></div>
                   <div><dt>Retry</dt><dd>{retryLabel(livePresentation.retryPolicy)}</dd></div>
                 </dl>
@@ -331,7 +331,7 @@ export function LabShell() {
             <div><h2>{presentation.title}</h2><p>{presentation.message}</p></div>
           </div>
           <dl className="verdict-facts">
-            <div><dt>Certainty</dt><dd>{certaintyLabel(presentation.certainty)}</dd></div>
+            <div><dt>Certainty</dt><dd>{certaintyLabel(presentation.certainty, presentation.outcome)}</dd></div>
             <div><dt>Fee</dt><dd>{feeLabel(presentation.feeImpact)}</dd></div>
             <div><dt>Retry</dt><dd>{retryLabel(presentation.retryPolicy)}</dd></div>
           </dl>
@@ -345,7 +345,7 @@ export function LabShell() {
           <div className="truth-comparison">
             <span>How this compares</span>
             <div className="naive"><small>What a naive dApp might say</small><strong><XCircle size={20} /> {naive.title}</strong><p>{naive.detail}</p></div>
-            <div className="proven"><small>What the evidence proves</small><strong><VerdictIcon size={20} /> {presentation.title}</strong><p>{certaintyLabel(presentation.certainty)}</p></div>
+            <div className="proven"><small>What the evidence proves</small><strong><VerdictIcon size={20} /> {presentation.title}</strong><p>{certaintyLabel(presentation.certainty, presentation.outcome)}</p></div>
           </div>
         </aside>
       </div>
